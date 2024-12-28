@@ -2,6 +2,12 @@
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const express = require('express')
+const app = express()
+const port = process.env.PORT || 4000;
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
 // const stringSimilarity = require('string-similarity');
 //  const isSimilarMessage= require('./checksimilarity');
 const {
@@ -279,3 +285,5 @@ console.log(`📋 ${senderId} is in the following shared groups:`, sharedGroups)
 
 // Start the bot
 client.initialize();
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
