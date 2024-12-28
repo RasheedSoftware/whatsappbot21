@@ -25,7 +25,7 @@ const client = new Client({
 
 // Display QR code in the terminal for authentication
 client.on('qr', (qr) => {
-            console.log( ${qr} )
+            console.log( `${qr}` )
     console.log('✅ QR Code received. Open your browser to scan it.');
     qrcode.toDataURL(qr, (err, url) => {
         if (err) {
@@ -33,8 +33,8 @@ client.on('qr', (qr) => {
             return;
         }
         qrCodeUrl = url; // Store QR Code as Base64 image
-        console.log( ${qrcode} )
-        console.log( ${qr} )
+        console.log( `${qrcode} `)
+        console.log( `${qr}` )
         console.log('Scan the QR code to log in.');
     });
 });
