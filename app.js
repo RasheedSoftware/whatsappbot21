@@ -44,7 +44,6 @@ client.on('ready', () => {
 
 // إعداد Express
 app.get('/', (req, res) => {
-                        <img src="${qrCodeUrl}" alt="QR Code">
 
     if (qrCodeUrl) {
         res.send(`
