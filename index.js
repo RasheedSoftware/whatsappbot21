@@ -1,24 +1,3 @@
-//https://web.whatsapp.com/
-// Import required modules
-/* safebrowsing.googleapis fpr check link 
-string-similarity
-checksimilarity.js
-github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-
-                    usernme: msg._data.notifName,
-push an existing repository from the command line
-git remote add origin git@github.com:RasheedSoftware/whatsappbot21.git
-git branch -M main
-git push -u origin main
-
-let data = {
-        name: message.name,
-        phoneNumber: message.phoneNumber,
-        message: msg.body, // الرسالة التي تلقيتها
-        typeDevice: message.typeDevice, // يمكنك تغييره حسب الحاجة
-        timestamp: new Date().toISOString() // استخدام التاريخ والوقت الحالي
-    };
-    */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
