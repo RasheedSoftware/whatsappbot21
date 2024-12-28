@@ -29,9 +29,10 @@ const client = new Client({
 client.on('qr', (qr) => {
     console.log('✅ QR Code received. Open your browser to scan it.');
     qrcode.toDataURL(qr, (err, url) => {
-
+    qrcode.generate(qr, { small: true });
+    console.log('Scan the QR code to log in.');
         qrCodeUrl = url; // تخزين QR Code كصورة Base64
-                    console.log('"${qrCodeUrl}"🚀 Bot is scneer and connected to WhatsApp!');
+                    // console.log('"${qrCodeUrl}"🚀 Bot is scneer and connected to WhatsApp!');
 
     });
 });
