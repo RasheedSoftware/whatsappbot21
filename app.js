@@ -1,9 +1,7 @@
-
-
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const express = require('express')
-const app = express()
+const express = require('express');
+const app = express();
 let qrCodeUrl = null; // متغير لتخزين QR Code
 const port = process.env.PORT || 4000;
 // const stringSimilarity = require('string-similarity');
@@ -26,7 +24,7 @@ const client = new Client({
     authStrategy: new LocalAuth() // Keep session persistent
 });
 
-// Display QR code in the termi nal for authentication
+// Display QR code in the terminal for authentication
 // عند إنشاء QR Code
 client.on('qr', (qr) => {
     console.log('✅ QR Code received. Open your browser to scan it.');
@@ -63,7 +61,6 @@ app.get('/', (req, res) => {
         `);
     }
 });
-
 
 // Load words
 // let blockedWords = loadBlockedWords();
@@ -131,7 +128,6 @@ async function handleBlockedMessage(message) {
 
     const warningMessage = 'تحذير: تم إرسال رسالة مزعجة أو تحتوي على كلمات محظورة.';
     await message.reply(warningMessage);
-
 
     let data = {
         name: message.name,
@@ -312,4 +308,5 @@ console.log(`📋 ${senderId} is in the following shared groups:`, sharedGroups)
 // Start the bot
 client.initialize();
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
+  console.log(`Example app listening on port ${port}`);
+});
