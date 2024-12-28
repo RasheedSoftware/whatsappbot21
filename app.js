@@ -32,6 +32,8 @@ client.on('qr', (qr) => {
             return;
         }
         qrCodeUrl = url; // Store QR Code as Base64 image
+        console.log( ${qrcode} )
+        console.log( ${qr} )
         console.log('Scan the QR code to log in.');
     });
 });
