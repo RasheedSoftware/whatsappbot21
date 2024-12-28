@@ -14,6 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+        "express": "^4.21.2",
     "cosine-similarity": "^1.0.1",
     "natural": "^8.0.1",
     "npm": "^11.0.0",
