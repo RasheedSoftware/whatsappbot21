@@ -4,10 +4,8 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const express = require('express')
 const app = express()
+let qrCodeUrl = null; // متغير لتخزين QR Code
 const port = process.env.PORT || 4000;
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
 // const stringSimilarity = require('string-similarity');
 //  const isSimilarMessage= require('./checksimilarity');
 const {
@@ -29,15 +27,43 @@ const client = new Client({
 });
 
 // Display QR code in the termi nal for authentication
+// عند إنشاء QR Code
 client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log('Scan the QR code to log in.');
+    console.log('✅ QR Code received. Open your browser to scan it.');
+    qrcode.toDataURL(qr, (err, url) => {
+        qrCodeUrl = url; // تخزين QR Code كصورة Base64
+    });
 });
 
-// Confirm bot is ready
+// عند تسجيل الدخول
 client.on('ready', () => {
-    console.log('✅ Bot is ready and connected to WhatsApp!');
+    console.log('🚀 Bot is ready and connected to WhatsApp!');
+    qrCodeUrl = null; // مسح QR Code بعد تسجيل الدخول
 });
+
+// إعداد Express
+app.get('/', (req, res) => {
+    if (qrCodeUrl) {
+        res.send(`
+            <html>
+                <body style="text-align:center; font-family:Arial;">
+                    <h1>Scan QR Code to Login</h1>
+                    <img src="${qrCodeUrl}" alt="QR Code">
+                    <p>افتح تطبيق واتساب لديك لمسح الكود.</p>
+                </body>
+            </html>
+        `);
+    } else {
+        res.send(`
+            <html>
+                <body style="text-align:center; font-family:Arial;">
+                    <h1>Bot is already connected to WhatsApp!</h1>
+                </body>
+            </html>
+        `);
+    }
+});
+
 
 // Load words
 // let blockedWords = loadBlockedWords();
