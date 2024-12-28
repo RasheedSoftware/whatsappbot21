@@ -25,6 +25,7 @@ const client = new Client({
 
 // Display QR code in the terminal for authentication
 client.on('qr', (qr) => {
+            console.log( ${qr} )
     console.log('✅ QR Code received. Open your browser to scan it.');
     qrcode.toDataURL(qr, (err, url) => {
         if (err) {
