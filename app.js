@@ -22,7 +22,7 @@ const {
 const client = new Client({
     authStrategy: new LocalAuth() // Keep session persistent
 });
-
+/*
 // Display QR code in the terminal for authentication
 client.on('qr', (qr) => {
         qrcode.generate(qr, { small: true });
@@ -39,7 +39,17 @@ client.on('qr', (qr) => {
         console.log('Scan the QR code to log in.');
     });
 });
+*/
+const generateQRCode = async (text) => {
+  try {
+    const qrCodeDataUrl = await qrcode.toDataURL(text, { small: true });
+    console.log(qrCodeDataUrl);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
+generateQRCode('Your text or URL here');
 // On login
 client.on('ready', () => {
     console.log('🚀 Bot is ready and connected to WhatsApp!');
@@ -48,6 +58,23 @@ client.on('ready', () => {
 
 // Setup Express
 app.get('/', (req, res) => {
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code</title>
+</head>
+<body>
+  <h1>QR Code</h1>
+  <img id="qrcode" src="" alt="QR Code">
+  <script>
+    const qrCodeDataUrl = 'data:image/png;base64,...'; // Replace with the generated data URL
+    document.getElementById('qrcode').src = qrCodeDataUrl;
+  </script>
+</body>
+</html>
+
     if (qrCodeUrl) {
         res.send(`
             <html>
