@@ -22,11 +22,11 @@ const {
 const client = new Client({
     authStrategy: new LocalAuth() // Keep session persistent
 });
-/*
+
 // Display QR code in the terminal for authentication
 client.on('qr', (qr) => {
-        qrcode.generate(qr, { small: true });
-            console.log( `${qr}` )
+    qrcode.generate(qr, { small: true });
+    console.log(`${qr}`);
     console.log('✅ QR Code received. Open your browser to scan it.');
     qrcode.toDataURL(qr, (err, url) => {
         if (err) {
@@ -34,22 +34,12 @@ client.on('qr', (qr) => {
             return;
         }
         qrCodeUrl = url; // Store QR Code as Base64 image
-        console.log( `${qrcode} `)
-        console.log( `${qr}` )
+        console.log(`${qrcode}`);
+        console.log(`${qr}`);
         console.log('Scan the QR code to log in.');
     });
 });
-*/
-const generateQRCode = async (text) => {
-  try {
-    const qrCodeDataUrl = await qrcode.toDataURL(text, { small: true });
-    console.log(qrCodeDataUrl);
-  } catch (err) {
-    console.error(err);
-  }
-};
 
-generateQRCode('Your text or URL here');
 // On login
 client.on('ready', () => {
     console.log('🚀 Bot is ready and connected to WhatsApp!');
@@ -58,25 +48,14 @@ client.on('ready', () => {
 
 // Setup Express
 app.get('/', (req, res) => {
-<html >
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code</title>
-</head>
-<body>
-  <h1>QR Code</h1>
-  <img id="qrcode" src="" alt="QR Code">
-  <script>
-    const qrCodeDataUrl = 'data:image/png;base64,...'; // Replace with the generated data URL
-    document.getElementById('qrcode').src = qrCodeDataUrl;
-  </script>
-</body>
-</html>
-
     if (qrCodeUrl) {
         res.send(`
             <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>QR Code</title>
+                </head>
                 <body style="text-align:center; font-family:Arial;">
                     <h1>Scan QR Code to Login</h1>
                     <img src="${qrCodeUrl}" alt="QR Code">
@@ -87,6 +66,11 @@ app.get('/', (req, res) => {
     } else {
         res.send(`
             <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>QR Code</title>
+                </head>
                 <body style="text-align:center; font-family:Arial;">
                     <h1>Bot is already connected to WhatsApp!</h1>
                 </body>
@@ -184,10 +168,10 @@ client.on('message', async (msg) => {
         const chat = await msg.getChat();
         const contact = await msg.getContact();
 
-        if (chat.isGroup ) {
+        if (chat.isGroup) {
             const senderId = msg.author; // Sender's ID
             const about = await contact.about || "no about info";
-            const newsstatus = await contact.status ||  "unknown";
+            const newsstatus = await contact.status || "unknown";
             const typeDevice = msg.typeDevice;
             const sharedGroups = await getSharedGroups(senderId);
 
@@ -201,7 +185,7 @@ client.on('message', async (msg) => {
                     phoneNumber: senderId,
                     message: wordToAddss,
                     typeDevice: msg.deviceType || "unknown",
-                    newsstatus: newsstatus ||  "unknown",
+                    newsstatus: newsstatus || "unknown",
                     about: about,
                     contactType: contact.isBusiness ? "Business" : "Regular",
                     sharedGroups: sharedGroups.length,
@@ -216,11 +200,11 @@ client.on('message', async (msg) => {
 
             if (msg.body.startsWith('!addword11 ')) {
                 let dataIfonBlock = {
-                    username: contact.pushname  || "Unnamed",
+                    username: contact.pushname || "Unnamed",
                     phoneNumber: senderId,
                     message: word,
                     typeDevice: msg.deviceType || "unknown",
-                    newsstatus: newsstatus ||  "unknown",
+                    newsstatus: newsstatus || "unknown",
                     about: about,
                     contactType: contact.isBusiness ? "Business" : "Regular",
                     sharedGroups: sharedGroups.length,
