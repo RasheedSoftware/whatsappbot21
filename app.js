@@ -4,7 +4,7 @@ const express = require('express');
 const app = express();
 
 // استخدام المنفذ من البيئة أو استخدام منفذ افتراضي
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 const {
     addBlockedWord,
