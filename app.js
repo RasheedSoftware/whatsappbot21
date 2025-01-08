@@ -2,8 +2,9 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const express = require('express');
 const app = express();
-let qrCodeUrl = null; // Variable to store QR Code
-const port = process.env.PORT || 4000;
+
+// استخدام المنفذ من البيئة أو استخدام منفذ افتراضي
+const PORT = process.env.PORT || 3000;
 
 const {
     addBlockedWord,
@@ -15,7 +16,11 @@ const {
     isSimilarMessage,
     blockedWords,
     helpRequests,
-    showBlockedWords
+    showBlockedWords,
+    blockedcontact,
+    loadBlockedcontact,
+    addBlockedContact,
+    saveBlockedkContact,
 } = require('./wordManager');
 
 // Initialize the WhatsApp client
@@ -26,61 +31,18 @@ const client = new Client({
 // Display QR code in the terminal for authentication
 client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
-    console.log(`${qr}`);
-    console.log('✅ QR Code received. Open your browser to scan it.');
-    qrcode.toDataURL(qr, (err, url) => {
-        if (err) {
-            console.error('Failed to generate QR code', err);
-            return;
-        }
-        qrCodeUrl = url; // Store QR Code as Base64 image
-        console.log(`${qrcode}`);
-        console.log(`${qr}`);
-        console.log('Scan the QR code to log in.');
-    });
+    console.log('Scan the QR code to log in.');
 });
 
-// On login
+// Confirm bot is ready
 client.on('ready', () => {
-    console.log('🚀 Bot is ready and connected to WhatsApp!');
-    qrCodeUrl = null; // Clear QR Code after login
+    console.log('✅ Bot is ready and connected to WhatsApp!');
 });
 
-// Setup Express
-app.get('/', (req, res) => {
-    if (qrCodeUrl) {
-        res.send(`
-            <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>QR Code</title>
-                </head>
-                <body style="text-align:center; font-family:Arial;">
-                    <h1>Scan QR Code to Login</h1>
-                    <img src="${qrCodeUrl}" alt="QR Code">
-                    <p>Open WhatsApp on your phone to scan the code.</p>
-                </body>
-            </html>
-        `);
-    } else {
-        res.send(`
-            <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>QR Code</title>
-                </head>
-                <body style="text-align:center; font-family:Arial;">
-                    <h1>Bot is already connected to WhatsApp!</h1>
-                </body>
-            </html>
-        `);
-    }
-});
-
-// Load words
+// Load words and contacts
 loadBlockedWords();
+loadBlockedcontact();
+
 let isLocked = false;
 
 // Utility functions
@@ -96,9 +58,9 @@ function isHelpRequest(messageBody) {
 // Check if a user is an admin in a group
 async function isAdmin(chat, userId) {
     try {
-        const participants = await chat.participants; // Fetch group participants
+        const participants = await chat.participants;
         const user = participants.find(p => p.id._serialized === userId);
-        return user?.isAdmin || user?.isSuperAdmin; // Return true if the user is admin
+        return user?.isAdmin || user?.isSuperAdmin;
     } catch (error) {
         console.error("Error checking admin status:", error);
         return false;
@@ -118,10 +80,10 @@ const isMessageBlocked = (message) => {
     return blockedWords.some((word) => message.includes(word));
 };
 
-// Function to get shared groups with the user
+// Fetch shared groups with the user
 async function getSharedGroups(senderId) {
     const chats = await client.getChats();
-    const groupChats = chats.filter(chat => chat.isGroup); // Get only groups
+    const groupChats = chats.filter(chat => chat.isGroup);
 
     const sharedGroups = [];
     for (const group of groupChats) {
@@ -136,23 +98,68 @@ async function getSharedGroups(senderId) {
     return sharedGroups;
 }
 
+// Check for duplicate contacts
+function isDuplicateContact(details) {
+    return blockedcontact.some(msg => msg.contact.phone === details.phone);
+}
+
+// Handle contact messages
+async function handleContact(msg, contact) {
+    const contactCard = msg.vCards && msg.vCards.length > 0 ? msg.vCards[0] : null;
+
+    if (contactCard) {
+        const details = extractContactDetails(contactCard);
+        console.log('📇 Contact details:', msg.vCards);
+
+        if (isDuplicateContact(details)) {
+            addBlockedContact(details);
+            await msg.delete(true);
+            console.log(`❌ Duplicate contact deleted from ${contact.number}`);
+        } else {
+          //  msg.reply('📇 . إذا كنت بحاجة لها، يرجى التواصل خاص.');
+          addBlockedContact(details);
+
+        }
+    }
+}
+
+// Extract contact details from a vCard
+function extractContactDetails(vCard) {
+    const lines = vCard.split('\n');
+    const nameLine = lines.find(line => line.startsWith('FN:')) || 'FN:غير معروف';
+    const phoneLines = lines.filter(line => line.startsWith('item1.TEL;'));
+
+    const name = nameLine.split(':')[1] || 'غير معروف';
+    const phones = phoneLines.length > 0 
+        ? phoneLines.map(line => line.split(':')[1]).join(', ') 
+        : 'TEL:غير معروف';
+
+    return {
+        name: name.trim(),
+        phones: phones || 'TEL:غير معروف',
+    };
+}
+
+
+
+
 // Handle blocked messages
 async function handleBlockedMessage(message) {
     const chat = await message.getChat();
-    const participant = message.author; // Sender's number
+    const participant = message.author;
 
-    const warningMessage = 'Warning: You have sent a message containing blocked words.';
+    const warningMessage = 'تحذير: تم إرسال رسالة مزعجة أو تحتوي على كلمات محظورة.';
     await message.reply(warningMessage);
 
     let data = {
         name: message.name,
         phoneNumber: message.phoneNumber,
-        message: msg.body, // The received message
-        typeDevice: message.typeDevice, // Change as needed
-        timestamp: new Date().toISOString() // Use current date and time
+        message: message.body,
+        typeDevice: message.typeDevice,
+        timestamp: new Date().toISOString()
     };
 
-    await message.delete(true); // True for immediate deletion
+    await message.delete(true);
 
     if (chat.isGroup) {
         if (typeof chat.removeParticipants === 'function') {
@@ -167,43 +174,67 @@ client.on('message', async (msg) => {
     try {
         const chat = await msg.getChat();
         const contact = await msg.getContact();
+        const senderId = msg.author;
 
-        if (chat.isGroup) {
-            const senderId = msg.author; // Sender's ID
+  if (await isAdmin(chat, senderId)) {
+                console.log("🔒 Cannot take action against an admin.");
+              //  return; // Exit if the sender is an admin
+            }
+    //    if (chat.isGroup) {
+  else if (chat.isGroup && (chat.name === 'MyBottry' ||chat.name==='ExpBot'||chat.name==='group123')) {
+
             const about = await contact.about || "no about info";
             const newsstatus = await contact.status || "unknown";
-            const typeDevice = msg.typeDevice;
-            const sharedGroups = await getSharedGroups(senderId);
-
             const restss = msg.body.split(' ');
+            const message1 =msg.body;
             const wordss = restss.join(' ');
             const wordToAddss = wordss.trim();
+            const typeDevice = msg.typeDevice;
+            const sharedGroups = await getSharedGroups(senderId);
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-            if (isSimilarMessage(wordToAddss, 0.45)) {
-                let dataIfonBlock = {
-                    username: contact.pushname || "Unnamed",
-                    phoneNumber: senderId,
-                    message: wordToAddss,
-                    typeDevice: msg.deviceType || "unknown",
-                    newsstatus: newsstatus || "unknown",
-                    about: about,
-                    contactType: contact.isBusiness ? "Business" : "Regular",
-                    sharedGroups: sharedGroups.length,
-                    timestamp: new Date().toISOString()
-                };
-                addBlockedWord(dataIfonBlock);
+            try {
+                if (msg.type === 'vcard') {
+                    await handleContact(msg, contact);
+                }
+               else if (urlRegex.test(message1)) {
+                await  msg.delete(true);
+                    msg.reply(`🚫 لا يُسمح بإرسال الروابط هنا. تم حذف الرسالة التي تحتوي على رابط. يُرجى إرسال الروابط فقط من قبل مشرفي المجموعة لتجنب النصابين.`);
+                    //chat.sendMessage(`🚫 لا يُسمح بإرسال الروابط هنا. تم حذف الرسالة التي تحتوي على رابط. يُرجى إرسال الروابط فقط من قبل مشرفي المجموعة لتجنب النصابين.`);
+                }
+                else if (isSimilarMessage(wordToAddss, 0.45)) {
+                    console.log(`📋 ${senderId} is in the following shared groups:`, sharedGroups);
+                    let dataIfonBlock = {
+                        username: contact.pushname || "Unnamed",
+                        phoneNumber: senderId,
+                        message: wordToAddss,
+                        typeDevice: msg.deviceType || "Uutype",
+                        newsstatus: newsstatus || "unknown",
+                        about: about,
+                        contactType: contact.isBusiness ? "Business" : "Regular",
+                        sharedGroups: sharedGroups.length,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    if (chat.isGroup && (chat.name === 'MyBottry' || chat.name === 'ExpBot' || chat.name === 'group123')) {
+                        await handleBlockedMessage(msg);
+                    }
+
+                    addBlockedWord(dataIfonBlock);
+                }
+            } catch (error) {
+                console.error("Error in processing message:", error);
             }
 
-            // Command handling
             const [command, category, ...rest] = msg.body.split(' ');
-            const word = rest.join(' '); // Join the rest for cases where the word has spaces
+            const word = rest.join(' ');
 
             if (msg.body.startsWith('!addword11 ')) {
                 let dataIfonBlock = {
                     username: contact.pushname || "Unnamed",
                     phoneNumber: senderId,
                     message: word,
-                    typeDevice: msg.deviceType || "unknown",
+                    typeDevice: msg.deviceType || "Uutype",
                     newsstatus: newsstatus || "unknown",
                     about: about,
                     contactType: contact.isBusiness ? "Business" : "Regular",
@@ -213,10 +244,6 @@ client.on('message', async (msg) => {
                 const wordToAdd = word.trim();
                 if (wordToAdd) {
                     addBlockedWord(dataIfonBlock);
-                    let responseMessage = `✅\nBlocked word added:\n`;
-                    for (const [key, value] of Object.entries(dataIfonBlock)) {
-                        responseMessage += `  ${key}: "${value}"\n`;
-                    }
                 }
                 return;
             }
@@ -225,41 +252,35 @@ client.on('message', async (msg) => {
                 const wordToRemove = word.trim();
                 if (wordToRemove) {
                     removeBlockedWord(wordToRemove);
-                    msg.reply(`✅ Blocked word removed: "${wordToRemove}"`);
                 }
                 return;
             }
 
             if (msg.body === '!showwords11') {
                 showBlockedWords();
-                msg.reply(`📋 Current blocked words:\n${blockedWords.join(', ')}`);
                 return;
             }
 
             if (msg.body.startsWith('!addrequest11 ')) {
                 addHelpRequest(category, word);
-                msg.reply(`✅ Word "${word}" added to category "${category}".`);
                 return;
             }
 
             if (msg.body === '!showrequests11') {
-                let response = '📋 Current words for each category:\n';
+                let response = '📋 الكلمات الحالية لكل فئة:\n';
                 for (const cat in helpRequests) {
                     response += `\n*${cat}:* ${helpRequests[cat].join(', ')}`;
                 }
-                msg.reply(response);
                 return;
             }
 
             if (msg.body === '!lock11') {
                 isLocked = true;
-                msg.reply('🔒 Bot is now locked.');
                 return;
             }
 
             if (msg.body === '!unlock11') {
                 isLocked = false;
-                msg.reply('🔓 Bot is now unlocked.');
                 return;
             }
         }
@@ -270,6 +291,13 @@ client.on('message', async (msg) => {
 
 // Start the bot
 client.initialize();
-app.listen(port, () => {
-    console.log(`App listening on port ${port}`);
+
+// إعدادات التطبيق (مثل المسارات)
+app.get('/', (req, res) => {
+    res.send('مرحبا بكم في التطبيق!');
 });
+
+// بدء الخادم
+app.listen(PORT, () => {
+    console.log(`الخادم يعمل على http://localhost:${PORT}`);
+});  
