@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
  "start": "node app.js",
-    "test": "jest"
+    "test": "jest",
+      "build": "tsc"
+
   },
 "engines": {
   "node": "22.12.0"
