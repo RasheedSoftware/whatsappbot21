@@ -9,11 +9,21 @@ const PORT = process.env.PORT || 4000;
 const {
     addBlockedWord,
     removeBlockedWord,
+    addHelpRequest,
+    removeHelpRequest,
     loadBlockedWords,
     loadHelpRequests,
-    loadBlockedContact,
+    loadHelpRequest1,
     isSimilarMessage,
+    blockedWords,
+    helpRequests,
+    helpRequests1,
     showBlockedWords,
+    blockedcontact,
+    loadBlockedcontact,
+    addBlockedContact,
+    addHelpRequest1,
+    saveHelpRequests1,
 } = require('./wordManager');
 
 async function startBot() {
@@ -29,9 +39,10 @@ async function startBot() {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
             qrcode.generate(qr, { small: true });
+            console.log('Scan the QR code to log in.');
         }
         if (connection === "open") {
-            console.log("✅ Bot is connected to WhatsApp!");
+            console.log("✅ Bot is ready and connected to WhatsApp!");
         } else if (connection === "close") {
             console.log("❌ Connection lost, reconnecting...");
             startBot();
@@ -39,7 +50,11 @@ async function startBot() {
     });
 
     loadBlockedWords();
+    loadBlockedcontact();
     loadHelpRequests();
+    loadHelpRequest1();
+
+    let isLocked = false;
 
     async function isAdmin(chat, userId) {
         try {
@@ -98,16 +113,9 @@ async function startBot() {
 
                 if (await isAdmin(chat, senderId)) {
                     console.log("🔒 Cannot take action against an admin.");
-                } else if (['Group1', 'Group2', 'MyBottry'].includes(groupName)) {
-                    if (isSimilarMessage(messageBody, 0.45)) {
+                } else if (['برمجه غرضيه موجه ه(عام)', 'استفسارات الجامعة خالد عام.', 'MyBottry','addrequest', 'MyBottry1', 'ExpBot', 'group123'].includes(groupName)) {
+                    if (isMessageBlocked(messageBody)) {
                         await handleBlockedMessage(msg, senderId);
-                        const blockData = {
-                            username: senderId,
-                            phoneNumber: senderId,
-                            message: messageBody,
-                            timestamp: new Date().toISOString()
-                        };
-                        addBlockedWord(blockData);
                     }
                 }
 
@@ -135,11 +143,42 @@ async function startBot() {
                     await sock.sendMessage(chat, { text: `📋 Current blocked words:\n${blockedWords.join(', ')}` });
                     return;
                 }
+
+                if (command === '!span' && await isAdmin(chat, senderId)) {
+                    const wordToSpan = word.trim();
+                    if (wordToSpan) {
+                        await handleBlockedMessage(msg, senderId);
+                        await sock.sendMessage(chat, { text: `✅ Span command executed by admin.` });
+                    }
+                    return;
+                }
+
+                if (command === '!lock1122' && await isAdmin(chat, senderId)) {
+                    isLocked = true;
+                    await sock.sendMessage(chat, { text: '🔒 Bot is now locked.' });
+                    return;
+                }
+
+                if (command === '!unlock1122' && await isAdmin(chat, senderId)) {
+                    isLocked = false;
+                    await sock.sendMessage(chat, { text: '🔓 Bot is now unlocked.' });
+                    return;
+                }
             }
         } catch (error) {
-            console.error("Error processing message:", error);
+            console.error("Error handling message:", error);
         }
     });
 }
 
 startBot();
+
+// Express server setup
+app.get('/', (req, res) => {
+    res.send('مرحبا بكم في التطبيق!');
+});
+
+// Start the server
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
