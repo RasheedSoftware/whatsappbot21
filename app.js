@@ -54,6 +54,18 @@ async function startBot() {
     loadHelpRequests();
     loadHelpRequest1();
 
+    const autoResponses = {
+        "شرح التخصصات": "هذا هو شرح التخصصات...",
+        "ضوابط التخصيص": "هذه هي ضوابط التخصيص...",
+        "خطط التخصصات": "هذه هي خطط التخصصات...",
+        "المسار الهندسي": "هذا هو المسار الهندسي...",
+        "نسب الغياب": "هذه هي نسب الغياب...",
+        "دليل KKU": "هذا هو دليل KKU...",
+        "التقويم الجامعي": "هذا هو التقويم الجامعي...",
+        "قروبات": "هذه هي القروبات..."
+    };
+
+    const pendingMessages = [];
     let isLocked = false;
 
     async function isAdmin(chat, userId) {
@@ -99,16 +111,34 @@ async function startBot() {
             if (isGroup) {
                 const metadata = await sock.groupMetadata(chat);
                 const groupName = metadata.subject;
+                const contact = await sock.getContact(senderId);
+                const about = contact.about || "no about info";
+                const newsStatus = contact.status || "unknown";
+                const sharedGroups = await sock.getSharedGroups(senderId);
+
+                if (autoResponses[messageBody]) {
+                    await sock.sendMessage(chat, { text: autoResponses[messageBody] });
+                }
+
+                if (isLocked) {
+                    pendingMessages.push({ msg, senderId, chat, messageBody });
+                    return;
+                }
 
                 if (isSimilarMessage(messageBody, 0.52)) {
                     console.log(`📋 ${senderId} in group: ${groupName}`);
-                    const blockData = {
-                        username: senderId,
+                    const dataIfonBlock = {
+                        username: contact.pushname || "Unnamed",
                         phoneNumber: senderId,
                         message: messageBody,
+                        typeDevice: msg.deviceType || "unknown",
+                        newsStatus: newsStatus,
+                        about: about,
+                        contactType: contact.isBusiness ? "Business" : "Regular",
+                        sharedGroups: sharedGroups.length,
                         timestamp: new Date().toISOString()
                     };
-                    addBlockedWord(blockData);
+                    addBlockedWord(dataIfonBlock);
                 }
 
                 if (await isAdmin(chat, senderId)) {
@@ -124,7 +154,18 @@ async function startBot() {
 
                 if (command === '!addword1122') {
                     const wordToAdd = word.trim();
-                    addBlockedWord({ username: senderId, phoneNumber: senderId, message: wordToAdd, timestamp: new Date().toISOString() });
+                    const dataIfonBlock = {
+                        username: contact.pushname || "Unnamed",
+                        phoneNumber: senderId,
+                        message: wordToAdd,
+                        typeDevice: msg.deviceType || "unknown",
+                        newsStatus: newsStatus,
+                        about: about,
+                        contactType: contact.isBusiness ? "Business" : "Regular",
+                        sharedGroups: sharedGroups.length,
+                        timestamp: new Date().toISOString()
+                    };
+                    addBlockedWord(dataIfonBlock);
                     await sock.sendMessage(chat, { text: `✅ Added blocked word: "${wordToAdd}"` });
                     return;
                 }
@@ -162,6 +203,12 @@ async function startBot() {
                 if (command === '!unlock1122' && await isAdmin(chat, senderId)) {
                     isLocked = false;
                     await sock.sendMessage(chat, { text: '🔓 Bot is now unlocked.' });
+                    pendingMessages.forEach(async ({ msg, senderId, chat, messageBody }) => {
+                        if (isMessageBlocked(messageBody)) {
+                            await handleBlockedMessage(msg, senderId);
+                        }
+                    });
+                    pendingMessages.length = 0;
                     return;
                 }
             }
