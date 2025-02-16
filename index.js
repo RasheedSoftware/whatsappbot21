@@ -1,258 +1,145 @@
-const fs = require("fs");
-const stringSimilarity = require("string-similarity");
-const cosineSimilarity = require("cosine-similarity");
-const natural = require("natural");
-const pathContact = "jsonUtils/blockContact.json";
-const pathRequist = "jsonUtils/helpRequests1.json";
-// Initialize blocked words and help requests
-let blockedWords = [];
-let blockedcontact = [];
-let helpRequests1 = [];
-let helpRequests = {
-    specialist: [],
-    tutor: [],
-    assistance: [],
-};
-const loadBlockedWords = () => {
-    const path = "jsonUtils/blockedWords.json"; // تأكد من أن المسار صحيح
-    if (fs.existsSync(path)) {
-        const data = fs.readFileSync(path, "utf8");
-        const parsedData = JSON.parse(data);
-        blockedWords = Array.isArray(parsedData.blockedWords)
-            ? parsedData.blockedWords
-            : []; // تأكد من أنه مصفوفة
-    } else {
-        blockedWords = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
-    }
-};
-const loadBlockedcontact = () => {
-    if (fs.existsSync(pathContact)) {
-        const data = fs.readFileSync(pathContact, "utf8");
-        const parsedData = JSON.parse(data);
-        blockedcontact = Array.isArray(parsedData.blockedcontact)
-            ? parsedData.blockedcontact
-            : []; // تأكد من أنه مصفوفة
-    } else {
-        blockedcontact = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
-    }
-};
-// Save blocked contact to JSON file
-const saveBlockedkContact = () => {
-    fs.writeFileSync(pathContact, JSON.stringify({ blockedcontact }, null, 2));
-};
-// Add a blocked contact
-const addBlockedContact = (word) => {
-    if (word && !blockedcontact.includes(word)) {
-        blockedcontact.push(word);
-        saveBlockedkContact(); // احفظ الكلمات المحظورة بعد الإضافة
-        console.log(`تم إضافة الكلمة المحظورة: ${word}`);
-    } else {
-        console.log(`الكلمة "${word}" موجودة بالفعل أو غير صحيحة.`);
-    }
-};
-const loadHelpRequests = () => {
-    const path = "jsonUtils/helpRequests.json"; // تأكد من المسار الصحيح
-    if (fs.existsSync(path)) {
-        const data = fs.readFileSync(path, "utf8"); // قراءة الملف
+const makeWASocket = require("@whiskeysockets/baileys").default;
+const { useMultiFileAuthState } = require("@whiskeysockets/baileys");
+const express = require('express');
+const app = express();
 
-        const parsedData = JSON.parse(data).helpRequests; // تحليل البيانات
-        helpRequests = Array.isArray(parsedData.helpRequests)
-            ? parsedData.helpRequests
-            : []; // تأكد من أنه مصفوفة
-    } else {
-        // إذا لم يكن الملف موجودًا، يمكنك إنشاءه بمحتوى افتراضي
-        saveHelpRequests(); // قم بإنشاء ملف افتراضي
-    }
-};
-// Save blocked words to JSON file
-const saveBlockedWords = () => {
-    fs.writeFileSync(
-        "jsonUtils/blockedWords.json",
-        JSON.stringify({ blockedWords }, null, 2),
-    );
-};
+// Set the port
+const PORT = process.env.PORT || 4000;
 
-// Save help requests to JSON file
-const saveHelpRequests = () => {
-    fs.writeFileSync(
-        "jsonUtils/helpRequests.json",
-        JSON.stringify({ helpRequests }, null, 2),
-    );
-};
-const saveHelpRequests1 = () => {
-    fs.writeFileSync(
-        "jsonUtils/helpRequests1.json",
-        JSON.stringify({ helpRequests1 }, null, 2),
-    );
-};
-
-// Add a blocked word
-const addBlockedWord = (word) => {
-    if (word && !blockedWords.includes(word)) {
-        blockedWords.push(word);
-        saveBlockedWords(); // احفظ الكلمات المحظورة بعد الإضافة
-        console.log(`تم إضافة الكلمة المحظورة: ${word}`);
-    } else {
-        console.log(`الكلمة "${word}" موجودة بالفعل أو غير صحيحة.`);
-    }
-};
-// Remove a blocked word
-const removeBlockedWord = (word) => {
-    blockedWords = blockedWords.filter((w) => w !== word);
-    saveBlockedWords();
-    console.log(`Removed blocked word: ${word}`);
-};
-
-// Add a help request
-const addHelpRequest = (category, request) => {
-    if (helpRequests[category] && !helpRequests[category].includes(request)) {
-        helpRequests[category].push(request);
-        saveHelpRequests();
-        console.log(`Added help request: ${request} to category: ${category}`);
-    } else {
-        console.log(
-            `Request "${request}" is already in the category "${category}" or category does not exist.`,
-        );
-    }
-};
-
-const addHelpRequest1 = (word) => {
-    if (word && !helpRequests1.includes(word)) {
-        blockedWords.push(word);
-        saveHelpRequests1(); // احفظ الكلمات المحظورة بعد الإضافة
-        console.log(`تم إضافة الكلمة المحظورة: ${word}`);
-    } else {
-        console.log(`الكلمة "${word}" موجودة بالفعل أو غير صحيحة.`);
-    }
-};
-const loadHelpRequest1 = () => {
-    if (fs.existsSync(pathRequist)) {
-        const data = fs.readFileSync(pathRequist, "utf8");
-        const parsedData = JSON.parse(data);
-        helpRequests1 = Array.isArray(parsedData.helpRequests1)
-            ? parsedData.helpRequests1
-            : []; // تأكد من أنه مصفوفة
-    } else {
-        helpRequests1 = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
-    }
-};
-// Remove a help request
-const removeHelpRequest = (category, request) => {
-    if (helpRequests[category]) {
-        helpRequests[category] = helpRequests[category].filter(
-            (r) => r !== request,
-        );
-        saveHelpRequests();
-        console.log(
-            `Removed help request: ${request} from category: ${category}`,
-        );
-    }
-};
-
-const showBlockedWords = () => {
-    if (!Array.isArray(blockedWords)) {
-        console.error("blockedWords is not defined or is not an array.");
-        return;
-    }
-    console.log("الكلمات المحظورة:", blockedWords.join(", ")); // استخدام join لعرض الكلمات
-};
-
-// function getTFIDFVector(text) {
-//     const tfidf = new natural.TfIdf();
-
-//     if (!Array.isArray(blockedWords)) {
-//         console.error("blockedWords is not an array:", blockedWords);
-//         return [];
-//     }
-
-//     blockedWords.forEach(msg => {
-//         if (msg.message) {
-//             tfidf.addDocument(msg.message);
-//         } else {
-//             console.error("Blocked word is missing 'message':", msg);
-//         }
-//     });
-
-//     const vector = [];
-//     tfidf.titles.forEach(title => {
-//         vector.push(tfidf.tfidfs[title][0] || 0);
-//     });
-//     return vector;
-// }
-// const getTFIDFVector = (text) => {
-//     loadBlockedWords(); // تحميل blockedWords عند استدعاء الدالة
-//     const tfidf = new natural.TfIdf();
-
-//     // Check if blockedWords is defined and an array
-//     if (!Array.isArray(blockedWords)) {
-//         throw new Error("blockedWords is not defined or is not an array");
-//     }
-
-//     // Use map to extract messages and filter out any undefined messages
-//     const messages = blockedWords
-//         .map(msg => msg.message)
-//         .filter(message => message !== undefined);
-
-//     messages.forEach(message => {
-//         tfidf.addDocument(message);
-//     });
-
-//     const vector = tfidf.titles.map(title => tfidf.tfidfs[title][0] || 0);
-//     return vector;
-// };
-
-// const isSimilarMessage = (newMessage, threshold = 0.8) => {
-//     if (!newMessage || typeof newMessage !== 'string') {
-//         throw new Error("newMessage must be a non-empty string");
-//     }
-
-//     const newVector = getTFIDFVector(newMessage);
-//     return blockedWords.some(msg => {
-//         const existingVector = getTFIDFVector(msg.message);
-//         const similarity = cosineSimilarity(newVector, existingVector);
-//          return similarity >= threshold;
-//     });
-// };
-
-function isSimilarMessage(newMessage, threshold = 0.4) {
-    if (!Array.isArray(blockedWords)) {
-        throw new Error("blockedWords is not defined or not an array");
-    }
-
-    const similarities = blockedWords.map((msg) => {
-        if (!msg.message || typeof msg.message !== "string") {
-            console.error("Blocked word is undefined or not a string:");
-            return 0; // أو يمكنك إرجاع قيمة افتراضية أخرى
-        }
-        return stringSimilarity.compareTwoStrings(msg.message, newMessage);
-    });
-    console.log(`similaritiessssssssss in `);
-
-    return similarities.some((similarity) => similarity >= threshold);
-}
-
-// Load initial data
-loadBlockedWords();
-loadHelpRequests();
-
-// Export functions for use
-module.exports = {
+// Import functions for managing words and users
+const {
     addBlockedWord,
     removeBlockedWord,
-    addHelpRequest,
-    removeHelpRequest,
     loadBlockedWords,
     loadHelpRequests,
-    showBlockedWords,
-    helpRequests,
-    blockedWords,
-    blockedcontact,
-    loadBlockedcontact,
-    addBlockedContact,
-    saveBlockedkContact,
+    loadBlockedContact,
     isSimilarMessage,
-    addHelpRequest1,
-    saveHelpRequests1,
-    loadHelpRequest1,
-};
+    showBlockedWords,
+} = require('./wordManager');
 
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "open") {
+            console.log("✅ Bot is connected to WhatsApp!");
+        } else if (connection === "close") {
+            console.log("❌ Connection lost, reconnecting...");
+            startBot();
+        }
+    });
+
+    // Load blocked words and contacts
+    loadBlockedWords();
+   // loadBlockedContact();
+    loadHelpRequests();
+
+    async function isAdmin(chat, userId) {
+        try {
+            const metadata = await sock.groupMetadata(chat);
+            return metadata.participants.some(p => p.id === userId && (p.admin === "admin" || p.admin === "superadmin"));
+        } catch (error) {
+            console.error("Error checking admin status:", error);
+            return false;
+        }
+    }
+
+    function isMessageBlocked(message) {
+        return blockedWords.some(word => message.includes(word));
+    }
+
+    async function handleBlockedMessage(msg, senderId) {
+        const chat = msg.key.remoteJid;
+        if (await isAdmin(chat, senderId)) {
+            console.log("🔒 Cannot take action against an admin.");
+            return;
+        }
+
+        await sock.sendMessage(chat, { delete: msg.key });
+        const metadata = await sock.groupMetadata(chat);
+
+        if (metadata && metadata.participants.some(p => p.id === senderId)) {
+            await sock.groupParticipantsUpdate(chat, [senderId], "remove");
+            console.log(`🚫 Removed ${senderId} from the group.`);
+        }
+    }
+
+    sock.ev.on("messages.upsert", async (m) => {
+        try {
+            const msg = m.messages[0];
+            if (!msg.message || !msg.key.remoteJid) return;
+
+            const senderId = msg.key.participant || msg.key.remoteJid;
+            const chat = msg.key.remoteJid;
+            const messageBody = msg.message.conversation || "";
+            const isGroup = chat.endsWith("@g.us");
+
+            if (isGroup) {
+                const metadata = await sock.groupMetadata(chat);
+                const groupName = metadata.subject;
+
+                if (isSimilarMessage(messageBody, 0.52)) {
+                    console.log(`📋 ${senderId} in group: ${groupName}`);
+                    const blockData = {
+                        username: senderId,
+                        phoneNumber: senderId,
+                        message: messageBody,
+                        timestamp: new Date().toISOString()
+                    };
+                    addBlockedWord(blockData);
+                }
+
+                if (await isAdmin(chat, senderId)) {
+                    console.log("🔒 Cannot take action against an admin.");
+                } else if (['Group1', 'Group2', 'MyBottry'].includes(groupName)) {
+                    if (isSimilarMessage(messageBody, 0.45)) {
+                        await handleBlockedMessage(msg, senderId);
+                        const blockData = {
+                            username: senderId,
+                            phoneNumber: senderId,
+                            message: messageBody,
+                            timestamp: new Date().toISOString()
+                        };
+                        addBlockedWord(blockData);
+                    }
+                }
+
+                const [command, ...rest] = messageBody.split(' ');
+                const word = rest.join(' ');
+
+                if (command === '!addword1122') {
+                    const wordToAdd = word.trim();
+                    addBlockedWord({ username: senderId, phoneNumber: senderId, message: wordToAdd, timestamp: new Date().toISOString() });
+                    await sock.sendMessage(chat, { text: `✅ Added blocked word: "${wordToAdd}"` });
+                    return;
+                }
+
+                if (command === '!removeword1122') {
+                    const wordToRemove = word.trim();
+                    if (wordToRemove) {
+                        removeBlockedWord(wordToRemove);
+                        await sock.sendMessage(chat, { text: `✅ Removed blocked word: "${wordToRemove}"` });
+                    }
+                    return;
+                }
+
+                if (command === '!showwords1122') {
+                    const wordsList = showBlockedWords();
+                    await sock.sendMessage(chat, { text: `📋 Current blocked words:\n${blockedWords.join(', ')}` });
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error("Error processing message:", error);
+        }
+    });
+}
+
+startBot();
