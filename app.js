@@ -1,303 +1,145 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const makeWASocket = require("@whiskeysockets/baileys").default;
+const { useMultiFileAuthState } = require("@whiskeysockets/baileys");
 const express = require('express');
 const app = express();
 
-// استخدام المنفذ من البيئة أو استخدام منفذ افتراضي
+// Set the port
 const PORT = process.env.PORT || 4000;
 
+// Import functions for managing words and users
 const {
     addBlockedWord,
     removeBlockedWord,
-    addHelpRequest,
-    removeHelpRequest,
     loadBlockedWords,
     loadHelpRequests,
+    loadBlockedContact,
     isSimilarMessage,
-    blockedWords,
-    helpRequests,
     showBlockedWords,
-    blockedcontact,
-    loadBlockedcontact,
-    addBlockedContact,
-    saveBlockedkContact,
 } = require('./wordManager');
 
-// Initialize the WhatsApp client
-const client = new Client({
-    authStrategy: new LocalAuth() // Keep session persistent
-});
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true
+    });
 
-// Display QR code in the terminal for authentication
-client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log('Scan the QR code to log in.');
-});
+    sock.ev.on('creds.update', saveCreds);
 
-// Confirm bot is ready
-client.on('ready', () => {
-    console.log('✅ Bot is ready and connected to WhatsApp!');
-});
-
-// Load words and contacts
-loadBlockedWords();
-loadBlockedcontact();
-
-let isLocked = false;
-
-// Utility functions
-function isHelpRequest(messageBody) {
-    for (const category in helpRequests) {
-        if (helpRequests[category].some(word => messageBody.includes(word))) {
-            return category;
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "open") {
+            console.log("✅ Bot is connected to WhatsApp!");
+        } else if (connection === "close") {
+            console.log("❌ Connection lost, reconnecting...");
+            startBot();
         }
-    }
-    return null;
-}
+    });
 
-// Check if a user is an admin in a group
-async function isAdmin(chat, userId) {
-    try {
-        const participants = await chat.participants;
-        const user = participants.find(p => p.id._serialized === userId);
-        return user?.isAdmin || user?.isSuperAdmin;
-    } catch (error) {
-        console.error("Error checking admin status:", error);
-        return false;
-    }
-}
+    // Load blocked words and contacts
+    loadBlockedWords();
+   // loadBlockedContact();
+    loadHelpRequests();
 
-// Check if a message contains blocked words
-const isMessageBlocked = (message) => {
-    console.log("Checking message:", message);
-    console.log("Blocked words:", blockedWords);
-
-    if (!Array.isArray(blockedWords)) {
-        console.error("blockedWords is not defined or is not an array.");
-        return false;
-    }
-
-    return blockedWords.some((word) => message.includes(word));
-};
-
-// Fetch shared groups with the user
-async function getSharedGroups(senderId) {
-    const chats = await client.getChats();
-    const groupChats = chats.filter(chat => chat.isGroup);
-
-    const sharedGroups = [];
-    for (const group of groupChats) {
-        const participants = await group.participants;
-        const isInGroup = participants.some(participant => participant.id._serialized === senderId);
-
-        if (isInGroup) {
-            sharedGroups.push(group.name);
+    async function isAdmin(chat, userId) {
+        try {
+            const metadata = await sock.groupMetadata(chat);
+            return metadata.participants.some(p => p.id === userId && (p.admin === "admin" || p.admin === "superadmin"));
+        } catch (error) {
+            console.error("Error checking admin status:", error);
+            return false;
         }
     }
 
-    return sharedGroups;
-}
+    function isMessageBlocked(message) {
+        return blockedWords.some(word => message.includes(word));
+    }
 
-// Check for duplicate contacts
-function isDuplicateContact(details) {
-    return blockedcontact.some(msg => msg.contact.phone === details.phone);
-}
+    async function handleBlockedMessage(msg, senderId) {
+        const chat = msg.key.remoteJid;
+        if (await isAdmin(chat, senderId)) {
+            console.log("🔒 Cannot take action against an admin.");
+            return;
+        }
 
-// Handle contact messages
-async function handleContact(msg, contact) {
-    const contactCard = msg.vCards && msg.vCards.length > 0 ? msg.vCards[0] : null;
+        await sock.sendMessage(chat, { delete: msg.key });
+        const metadata = await sock.groupMetadata(chat);
 
-    if (contactCard) {
-        const details = extractContactDetails(contactCard);
-        console.log('📇 Contact details:', msg.vCards);
-
-        if (isDuplicateContact(details)) {
-            addBlockedContact(details);
-            await msg.delete(true);
-            console.log(`❌ Duplicate contact deleted from ${contact.number}`);
-        } else {
-          //  msg.reply('📇 . إذا كنت بحاجة لها، يرجى التواصل خاص.');
-          addBlockedContact(details);
-
+        if (metadata && metadata.participants.some(p => p.id === senderId)) {
+            await sock.groupParticipantsUpdate(chat, [senderId], "remove");
+            console.log(`🚫 Removed ${senderId} from the group.`);
         }
     }
-}
 
-// Extract contact details from a vCard
-function extractContactDetails(vCard) {
-    const lines = vCard.split('\n');
-    const nameLine = lines.find(line => line.startsWith('FN:')) || 'FN:غير معروف';
-    const phoneLines = lines.filter(line => line.startsWith('item1.TEL;'));
+    sock.ev.on("messages.upsert", async (m) => {
+        try {
+            const msg = m.messages[0];
+            if (!msg.message || !msg.key.remoteJid) return;
 
-    const name = nameLine.split(':')[1] || 'غير معروف';
-    const phones = phoneLines.length > 0 
-        ? phoneLines.map(line => line.split(':')[1]).join(', ') 
-        : 'TEL:غير معروف';
+            const senderId = msg.key.participant || msg.key.remoteJid;
+            const chat = msg.key.remoteJid;
+            const messageBody = msg.message.conversation || "";
+            const isGroup = chat.endsWith("@g.us");
 
-    return {
-        name: name.trim(),
-        phones: phones || 'TEL:غير معروف',
-    };
-}
+            if (isGroup) {
+                const metadata = await sock.groupMetadata(chat);
+                const groupName = metadata.subject;
 
-
-
-
-// Handle blocked messages
-async function handleBlockedMessage(message) {
-    const chat = await message.getChat();
-    const participant = message.author;
-
-    const warningMessage = 'تحذير: تم إرسال رسالة مزعجة أو تحتوي على كلمات محظورة.';
-    await message.reply(warningMessage);
-
-    let data = {
-        name: message.name,
-        phoneNumber: message.phoneNumber,
-        message: message.body,
-        typeDevice: message.typeDevice,
-        timestamp: new Date().toISOString()
-    };
-
-    await message.delete(true);
-
-    if (chat.isGroup) {
-        if (typeof chat.removeParticipants === 'function') {
-            await chat.removeParticipants([participant]);
-            console.log(`Removed ${participant} from the group.`);
-        }
-    }
-}
-
-// Main logic to monitor messages
-client.on('message', async (msg) => {
-    try {
-        const chat = await msg.getChat();
-        const contact = await msg.getContact();
-        const senderId = msg.author;
-
-  if (await isAdmin(chat, senderId)) {
-                console.log("🔒 Cannot take action against an admin.");
-              //  return; // Exit if the sender is an admin
-            }
-    //    if (chat.isGroup) {
-  else if (chat.isGroup && (chat.name === 'MyBottry' ||chat.name==='ExpBot'||chat.name==='group123')) {
-
-            const about = await contact.about || "no about info";
-            const newsstatus = await contact.status || "unknown";
-            const restss = msg.body.split(' ');
-            const message1 =msg.body;
-            const wordss = restss.join(' ');
-            const wordToAddss = wordss.trim();
-            const typeDevice = msg.typeDevice;
-            const sharedGroups = await getSharedGroups(senderId);
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-
-            try {
-                if (msg.type === 'vcard') {
-                    await handleContact(msg, contact);
-                }
-               else if (urlRegex.test(message1)) {
-                await  msg.delete(true);
-                    msg.reply(`🚫 لا يُسمح بإرسال الروابط هنا. تم حذف الرسالة التي تحتوي على رابط. يُرجى إرسال الروابط فقط من قبل مشرفي المجموعة لتجنب النصابين.`);
-                    //chat.sendMessage(`🚫 لا يُسمح بإرسال الروابط هنا. تم حذف الرسالة التي تحتوي على رابط. يُرجى إرسال الروابط فقط من قبل مشرفي المجموعة لتجنب النصابين.`);
-                }
-                else if (isSimilarMessage(wordToAddss, 0.45)) {
-                    console.log(`📋 ${senderId} is in the following shared groups:`, sharedGroups);
-                    let dataIfonBlock = {
-                        username: contact.pushname || "Unnamed",
+                if (isSimilarMessage(messageBody, 0.52)) {
+                    console.log(`📋 ${senderId} in group: ${groupName}`);
+                    const blockData = {
+                        username: senderId,
                         phoneNumber: senderId,
-                        message: wordToAddss,
-                        typeDevice: msg.deviceType || "Uutype",
-                        newsstatus: newsstatus || "unknown",
-                        about: about,
-                        contactType: contact.isBusiness ? "Business" : "Regular",
-                        sharedGroups: sharedGroups.length,
+                        message: messageBody,
                         timestamp: new Date().toISOString()
                     };
+                    addBlockedWord(blockData);
+                }
 
-                    if (chat.isGroup && (chat.name === 'MyBottry' || chat.name === 'ExpBot' || chat.name === 'group123')) {
-                        await handleBlockedMessage(msg);
+                if (await isAdmin(chat, senderId)) {
+                    console.log("🔒 Cannot take action against an admin.");
+                } else if (['Group1', 'Group2', 'MyBottry'].includes(groupName)) {
+                    if (isSimilarMessage(messageBody, 0.45)) {
+                        await handleBlockedMessage(msg, senderId);
+                        const blockData = {
+                            username: senderId,
+                            phoneNumber: senderId,
+                            message: messageBody,
+                            timestamp: new Date().toISOString()
+                        };
+                        addBlockedWord(blockData);
                     }
-
-                    addBlockedWord(dataIfonBlock);
                 }
-            } catch (error) {
-                console.error("Error in processing message:", error);
-            }
 
-            const [command, category, ...rest] = msg.body.split(' ');
-            const word = rest.join(' ');
+                const [command, ...rest] = messageBody.split(' ');
+                const word = rest.join(' ');
 
-            if (msg.body.startsWith('!addword11 ')) {
-                let dataIfonBlock = {
-                    username: contact.pushname || "Unnamed",
-                    phoneNumber: senderId,
-                    message: word,
-                    typeDevice: msg.deviceType || "Uutype",
-                    newsstatus: newsstatus || "unknown",
-                    about: about,
-                    contactType: contact.isBusiness ? "Business" : "Regular",
-                    sharedGroups: sharedGroups.length,
-                    timestamp: new Date().toISOString()
-                };
-                const wordToAdd = word.trim();
-                if (wordToAdd) {
-                    addBlockedWord(dataIfonBlock);
+                if (command === '!addword1122') {
+                    const wordToAdd = word.trim();
+                    addBlockedWord({ username: senderId, phoneNumber: senderId, message: wordToAdd, timestamp: new Date().toISOString() });
+                    await sock.sendMessage(chat, { text: `✅ Added blocked word: "${wordToAdd}"` });
+                    return;
                 }
-                return;
-            }
 
-            if (msg.body.startsWith('!removeword11 ')) {
-                const wordToRemove = word.trim();
-                if (wordToRemove) {
-                    removeBlockedWord(wordToRemove);
+                if (command === '!removeword1122') {
+                    const wordToRemove = word.trim();
+                    if (wordToRemove) {
+                        removeBlockedWord(wordToRemove);
+                        await sock.sendMessage(chat, { text: `✅ Removed blocked word: "${wordToRemove}"` });
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (msg.body === '!showwords11') {
-                showBlockedWords();
-                return;
-            }
-
-            if (msg.body.startsWith('!addrequest11 ')) {
-                addHelpRequest(category, word);
-                return;
-            }
-
-            if (msg.body === '!showrequests11') {
-                let response = '📋 الكلمات الحالية لكل فئة:\n';
-                for (const cat in helpRequests) {
-                    response += `\n*${cat}:* ${helpRequests[cat].join(', ')}`;
+                if (command === '!showwords1122') {
+                    const wordsList = showBlockedWords();
+                    await sock.sendMessage(chat, { text: `📋 Current blocked words:\n${blockedWords.join(', ')}` });
+                    return;
                 }
-                return;
             }
-
-            if (msg.body === '!lock11') {
-                isLocked = true;
-                return;
-            }
-
-            if (msg.body === '!unlock11') {
-                isLocked = false;
-                return;
-            }
+        } catch (error) {
+            console.error("Error processing message:", error);
         }
-    } catch (error) {
-        console.error("Error handling message:", error);
-    }
-});
+    });
+}
 
-// Start the bot
-client.initialize();
-
-// إعدادات التطبيق (مثل المسارات)
-app.get('/', (req, res) => {
-    res.send('مرحبا بكم في التطبيق!');
-});
-
-// بدء الخادم
-app.listen(PORT, () => {
-    console.log(`الخادم يعمل على http://localhost:${PORT}`);
-});  
+startBot();
