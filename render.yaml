@@ -1,0 +1,12 @@
+version: 1
+services:
+  - type: web
+    name: whatsappbot21
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+    plan: free
