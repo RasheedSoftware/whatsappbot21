@@ -1,34 +1,64 @@
- const fs = require('fs');
- const stringSimilarity = require('string-similarity');
- const cosineSimilarity = require('cosine-similarity');
- const natural = require('natural');
- 
+const fs = require("fs");
+const stringSimilarity = require("string-similarity");
+const cosineSimilarity = require("cosine-similarity");
+const natural = require("natural");
+const pathContact = "jsonUtils/blockContact.json";
+const pathRequist = "jsonUtils/helpRequests1.json";
 // Initialize blocked words and help requests
 let blockedWords = [];
+let blockedcontact = [];
+let helpRequests1 = [];
 let helpRequests = {
     specialist: [],
     tutor: [],
-    assistance: []
+    assistance: [],
 };
 const loadBlockedWords = () => {
-    const path = 'jsonUtils/blockedWords.json'; // تأكد من أن المسار صحيح
+    const path = "jsonUtils/blockedWords.json"; // تأكد من أن المسار صحيح
     if (fs.existsSync(path)) {
-        const data = fs.readFileSync(path, 'utf8');
+        const data = fs.readFileSync(path, "utf8");
         const parsedData = JSON.parse(data);
-        blockedWords = Array.isArray(parsedData.blockedWords) ? parsedData.blockedWords : []; // تأكد من أنه مصفوفة
+        blockedWords = Array.isArray(parsedData.blockedWords)
+            ? parsedData.blockedWords
+            : []; // تأكد من أنه مصفوفة
     } else {
         blockedWords = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
     }
 };
-
+const loadBlockedcontact = () => {
+    if (fs.existsSync(pathContact)) {
+        const data = fs.readFileSync(pathContact, "utf8");
+        const parsedData = JSON.parse(data);
+        blockedcontact = Array.isArray(parsedData.blockedcontact)
+            ? parsedData.blockedcontact
+            : []; // تأكد من أنه مصفوفة
+    } else {
+        blockedcontact = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
+    }
+};
+// Save blocked contact to JSON file
+const saveBlockedkContact = () => {
+    fs.writeFileSync(pathContact, JSON.stringify({ blockedcontact }, null, 2));
+};
+// Add a blocked contact
+const addBlockedContact = (word) => {
+    if (word && !blockedcontact.includes(word)) {
+        blockedcontact.push(word);
+        saveBlockedkContact(); // احفظ الكلمات المحظورة بعد الإضافة
+        console.log(`تم إضافة الكلمة المحظورة: ${word}`);
+    } else {
+        console.log(`الكلمة "${word}" موجودة بالفعل أو غير صحيحة.`);
+    }
+};
 const loadHelpRequests = () => {
-    const path = 'jsonUtils/helpRequests.json'; // تأكد من المسار الصحيح
+    const path = "jsonUtils/helpRequests.json"; // تأكد من المسار الصحيح
     if (fs.existsSync(path)) {
-        const data = fs.readFileSync(path, 'utf8'); // قراءة الملف
-         
-        const parsedData= JSON.parse(data).helpRequests; // تحليل البيانات
-        helpRequests = Array.isArray(parsedData.helpRequests) ? parsedData.helpRequests : []; // تأكد من أنه مصفوفة
+        const data = fs.readFileSync(path, "utf8"); // قراءة الملف
 
+        const parsedData = JSON.parse(data).helpRequests; // تحليل البيانات
+        helpRequests = Array.isArray(parsedData.helpRequests)
+            ? parsedData.helpRequests
+            : []; // تأكد من أنه مصفوفة
     } else {
         // إذا لم يكن الملف موجودًا، يمكنك إنشاءه بمحتوى افتراضي
         saveHelpRequests(); // قم بإنشاء ملف افتراضي
@@ -36,12 +66,24 @@ const loadHelpRequests = () => {
 };
 // Save blocked words to JSON file
 const saveBlockedWords = () => {
-    fs.writeFileSync('jsonUtils/blockedWords.json', JSON.stringify({ blockedWords }, null, 2));
+    fs.writeFileSync(
+        "jsonUtils/blockedWords.json",
+        JSON.stringify({ blockedWords }, null, 2),
+    );
 };
 
 // Save help requests to JSON file
 const saveHelpRequests = () => {
-    fs.writeFileSync('jsonUtils/helpRequests.json', JSON.stringify({ helpRequests }, null, 2));
+    fs.writeFileSync(
+        "jsonUtils/helpRequests.json",
+        JSON.stringify({ helpRequests }, null, 2),
+    );
+};
+const saveHelpRequests1 = () => {
+    fs.writeFileSync(
+        "jsonUtils/helpRequests1.json",
+        JSON.stringify({ helpRequests1 }, null, 2),
+    );
 };
 
 // Add a blocked word
@@ -56,7 +98,7 @@ const addBlockedWord = (word) => {
 };
 // Remove a blocked word
 const removeBlockedWord = (word) => {
-    blockedWords = blockedWords.filter(w => w !== word);
+    blockedWords = blockedWords.filter((w) => w !== word);
     saveBlockedWords();
     console.log(`Removed blocked word: ${word}`);
 };
@@ -68,16 +110,42 @@ const addHelpRequest = (category, request) => {
         saveHelpRequests();
         console.log(`Added help request: ${request} to category: ${category}`);
     } else {
-        console.log(`Request "${request}" is already in the category "${category}" or category does not exist.`);
+        console.log(
+            `Request "${request}" is already in the category "${category}" or category does not exist.`,
+        );
     }
 };
 
+const addHelpRequest1 = (word) => {
+    if (word && !helpRequests1.includes(word)) {
+        blockedWords.push(word);
+        saveHelpRequests1(); // احفظ الكلمات المحظورة بعد الإضافة
+        console.log(`تم إضافة الكلمة المحظورة: ${word}`);
+    } else {
+        console.log(`الكلمة "${word}" موجودة بالفعل أو غير صحيحة.`);
+    }
+};
+const loadHelpRequest1 = () => {
+    if (fs.existsSync(pathRequist)) {
+        const data = fs.readFileSync(pathRequist, "utf8");
+        const parsedData = JSON.parse(data);
+        helpRequests1 = Array.isArray(parsedData.helpRequests1)
+            ? parsedData.helpRequests1
+            : []; // تأكد من أنه مصفوفة
+    } else {
+        helpRequests1 = []; // إذا لم يكن الملف موجودًا، ابدأ بمصفوفة فارغة
+    }
+};
 // Remove a help request
 const removeHelpRequest = (category, request) => {
     if (helpRequests[category]) {
-        helpRequests[category] = helpRequests[category].filter(r => r !== request);
+        helpRequests[category] = helpRequests[category].filter(
+            (r) => r !== request,
+        );
         saveHelpRequests();
-        console.log(`Removed help request: ${request} from category: ${category}`);
+        console.log(
+            `Removed help request: ${request} from category: ${category}`,
+        );
     }
 };
 
@@ -86,9 +154,8 @@ const showBlockedWords = () => {
         console.error("blockedWords is not defined or is not an array.");
         return;
     }
-    console.log("الكلمات المحظورة:", blockedWords.join(', ')); // استخدام join لعرض الكلمات
+    console.log("الكلمات المحظورة:", blockedWords.join(", ")); // استخدام join لعرض الكلمات
 };
-
 
 // function getTFIDFVector(text) {
 //     const tfidf = new natural.TfIdf();
@@ -152,8 +219,8 @@ function isSimilarMessage(newMessage, threshold = 0.4) {
         throw new Error("blockedWords is not defined or not an array");
     }
 
-    const similarities = blockedWords.map(msg => {
-        if (!msg.message || typeof msg.message !== 'string') {
+    const similarities = blockedWords.map((msg) => {
+        if (!msg.message || typeof msg.message !== "string") {
             console.error("Blocked word is undefined or not a string:");
             return 0; // أو يمكنك إرجاع قيمة افتراضية أخرى
         }
@@ -161,9 +228,8 @@ function isSimilarMessage(newMessage, threshold = 0.4) {
     });
     console.log(`similaritiessssssssss in `);
 
-    return similarities.some(similarity => similarity >= threshold);
+    return similarities.some((similarity) => similarity >= threshold);
 }
-
 
 // Load initial data
 loadBlockedWords();
@@ -180,7 +246,12 @@ module.exports = {
     showBlockedWords,
     helpRequests,
     blockedWords,
-    isSimilarMessage
-
-
+    blockedcontact,
+    loadBlockedcontact,
+    addBlockedContact,
+    saveBlockedkContact,
+    isSimilarMessage,
+    addHelpRequest1,
+    saveHelpRequests1,
+    loadHelpRequest1,
 };
