@@ -1,12 +1,11 @@
 const makeWASocket = require("@whiskeysockets/baileys").default;
 const { useMultiFileAuthState } = require("@whiskeysockets/baileys");
 const express = require('express');
+const qrcode = require('qrcode-terminal');
 const app = express();
 
-// Set the port
 const PORT = process.env.PORT || 4000;
 
-// Import functions for managing words and users
 const {
     addBlockedWord,
     removeBlockedWord,
@@ -21,13 +20,16 @@ async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true
+        printQRInTerminal: false
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+            qrcode.generate(qr, { small: true });
+        }
         if (connection === "open") {
             console.log("✅ Bot is connected to WhatsApp!");
         } else if (connection === "close") {
@@ -36,9 +38,7 @@ async function startBot() {
         }
     });
 
-    // Load blocked words and contacts
     loadBlockedWords();
-   // loadBlockedContact();
     loadHelpRequests();
 
     async function isAdmin(chat, userId) {
